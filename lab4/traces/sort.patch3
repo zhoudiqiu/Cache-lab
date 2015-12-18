@@ -1,0 +1,59 @@
+--- sort.trace.orig	2015-10-22 12:29:27.933858000 -0500
++++ sort.trace	2015-10-22 12:40:41.989954000 -0500
+@@ -2012,8 +2012,6 @@
+  L ffefff468,8
+  L ffefff5a4,4
+  S ffefff3d8,8
+---3483-- Reading syms from /usr/lib64/valgrind/vgpreload_core-amd64-linux.so
+---3483--    object doesn't have a symbol table
+  L ffefff3d8,8
+  L ffefff470,4
+  L 040212a0,8
+@@ -3261,7 +3259,6 @@
+  L ffefff2d8,8
+  L ffefff474,4
+  S ffefff248,8
+---3483-- Reading syms from /usr/lib64/libpthread-2.17.so
+  L ffefff248,8
+  L ffefff2e0,4
+  L 040217b0,8
+@@ -4831,7 +4828,6 @@
+  L ffefff278,8
+  L ffefff444,4
+  S ffefff1e8,8
+---3483-- Reading syms from /usr/lib64/libc-2.17.so
+  L ffefff1e8,8
+  L ffefff280,4
+  L 04021c78,8
+@@ -131589,7 +131585,6 @@
+  L 051fd230,4
+  S ffeffcfd8,8
+  L 05201ff4,4
+-sort: I  04f299e0,6
+  L ffeffcfd8,8
+  L 051fd250,8
+  L ffeffcfe8,8
+@@ -132054,7 +132049,6 @@
+  L 051fd230,4
+  S ffeffd048,8
+  L 05201ff4,4
+-cannot read: 1000I  04f299e0,6
+  L ffeffd048,8
+  L 051fd250,8
+  L ffeffd058,8
+@@ -140266,7 +140260,6 @@
+  L 051fd230,4
+  S ffeffcb38,8
+  L 05201ff4,4
+-: No such file or directoryI  04f299e0,6
+  L ffeffcb38,8
+  L 051fd250,8
+  L ffeffcb48,8
+@@ -140510,7 +140503,6 @@
+  L 051fd230,4
+  S ffeffcf48,8
+  L 05201ff4,4
+-
+  L ffeffcf48,8
+  L 051fd250,8
+  L ffeffcf58,8

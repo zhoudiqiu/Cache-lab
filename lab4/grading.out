@@ -1,0 +1,304 @@
+
+CS:APP Cache Lab: Grading Sheet for zhoudiqiu-csim.c
+
+Part 1: Compiling test framework
+
+gcc -g -Wall -Werror -std=c99 -o csim csim.c cachelab.c -lm 
+gcc -g -Wall -Werror -std=c99 -o csim-ref csim-ref.c cachelab.c -lm
+gcc -g -Wall -Werror -std=c99 -o test-csim test-csim.c 
+
+
+Part 2: Running the driver
+
+test-csim out:
+
+ Invoked for GRADING.
+                        Your simulator     Reference simulator
+Points (s,E,b)    Hits  Misses  Evicts    Hits  Misses  Evicts
+     3 (1,1,1)       9       8       6       9       8       6  traces/yi2.trace
+     3 (4,2,4)       4       5       2       4       5       2  traces/yi.trace
+     3 (2,1,4)       2       3       1       2       3       1  traces/dave.trace
+     3 (2,1,3)     167      71      67     167      71      67  traces/trans.trace
+     3 (3,2,4)     226      12       0     226      12       0  traces/trans.trace
+     3 (1,4,3)     204      34      26     204      34      26  traces/trans.trace
+     3 (4,2,5)     231       7       0     231       7       0  traces/trans.trace
+     6 (5,8,6)  140891    5209    4953  140891    5209    4953  traces/sort.trace
+     6 (6,3,5)  280805    6159    5967  280805    6159    5967  traces/long.trace
+     6 (5,4,4)  135205   36298   36170  135205   36298   36170  traces/sort4k.trace
+    39
+
+TEST_CSIM_RESULTS=39
+
+
+Final score: 39
+
+
+
+Part 3: Grade
+
+
+Score : 39.0 / 39
+
+Part 4: Handin files for zhoudiqiu-csim.c
+
+
+*** csim.c ***
+#include "cachelab.h"
+#include <getopt.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdio.h>
+#include <math.h>
+//Name: Diqiu Zhou
+//wustl key: zhoudiqiu
+
+
+//various datatypes to build the cache
+typedef struct{
+    int s;//2^s sets
+    int S;//S=2^s
+    int b;//2^b per block	
+    int B;//B=2^b
+    int E;//number of lines per set
+    //number to track the solution	
+    int hitNum;
+    int missNum;
+    int evictionNum;
+    int verbosity;
+} cacheProperty;
+
+typedef struct {
+    int valid;
+    unsigned long long tag;
+    char *block;
+    int usedCounter;
+} setLine;
+
+typedef struct {
+    setLine *lines;
+} cacheSet;
+
+typedef struct {
+    cacheSet *sets;
+} cache;
+
+//initiate the cache
+cache initiate(long long S, int E) 
+{
+    cache currentCache;	
+    cacheSet set;
+    setLine line;
+    currentCache.sets = (cacheSet *) malloc(sizeof(cacheSet) * S);
+    //loop to construct the set of the cache
+    int i = 0;
+    for (i = 0; i < S; i++) 
+    {
+        set.lines =  (setLine *) malloc(sizeof(setLine) * E);
+        currentCache.sets[i] = set;
+        //loop to construct the lines
+        int j = 0;
+        for (j = 0; j < E; j++) 
+        {
+            line.valid = 0; 
+            line.tag = 0; 
+            set.lines[j] = line;
+            line.usedCounter = 0;
+        }
+    } 
+    return currentCache;
+}
+//verbosity
+int verbosity = 0;
+
+//print usage message
+void printUsage(){
+    printf("Usage: ./csim [-h] [-v] -s <s> -E <E> -b <b> -t <tracefile>\n");
+    printf("-s: number of set index(2^s sets)\n");
+    printf("-E: number of lines per set\n");
+    printf("-b: number of block offset bits\n");
+    printf("-t: trace file name\n");
+}
+//method to check if hit
+int checkHit(setLine line, unsigned long long tag){
+    if(line.valid){
+        if(line.tag == tag){
+            return 1;
+        }
+    }
+    return 0;
+}
+//method to check if the set is full
+int checkFull(cacheSet set, cacheProperty property){
+    int i = 0;
+    for(i = 0; i<property.E; i++){
+        if(set.lines[i].valid == 0){
+            return 1;
+        }
+    }
+    return 0;
+}
+//method to find the next open line
+int findIndex(cacheSet set, cacheProperty property){
+    int i = 0;
+    for(i = 0; i<property.E; i++){
+        if(set.lines[i].valid == 0){
+            return i;
+        }
+    }
+    //shouldn't get a -1 anyway, method only called when there is granted space
+    return -1;
+}
+//method to find the line to evict
+int findEvict(cacheSet set, cacheProperty property){
+    int min = set.lines[0].usedCounter;
+    int i = 0;
+    int index = 0;
+    for(i = 0; i < property.E ; i++){
+        if(min>set.lines[i].usedCounter){
+            index = i;
+            min = set.lines[i].usedCounter;
+        }
+    }
+    return index;
+}
+
+int findMax(cacheSet set, cacheProperty property){
+    int max = set.lines[0].usedCounter;
+    int i = 0;
+    int index = 0;
+    for(i = 0; i < property.E ; i++){
+        if(set.lines[i].usedCounter>max){
+            index = i;
+            max = set.lines[i].usedCounter;
+        }
+    }
+    return index;
+}
+
+cacheProperty simulate(cache currentCache,cacheProperty property, unsigned long long address){
+    //compute the size of the tag, 64 bit system
+    int tagSize = 64-(property.b + property.s);
+    unsigned long long tag = address >> (property.s + property.b);
+    //use the tagSize to compute for the set index
+    unsigned long long temp = address << (tagSize);
+    unsigned long long setIndex = temp >> (tagSize + property.b);
+    cacheSet set = currentCache.sets[setIndex];
+    //loop through lines in the set
+    int i = 0;
+    int hit = 0;
+    for (i = 0; i<property.E; i++){
+        setLine currentLine = set.lines[i];
+        //check if there is a hit
+        if(checkHit(currentLine, tag) == 1){
+            //if hit, update the staffs in the property
+            property.hitNum+=1;
+            int max = 0;
+            hit = 1;
+            max = findMax(set, property);
+            currentCache.sets[setIndex].lines[i].usedCounter = currentCache.sets[setIndex].lines[max].usedCounter+1;
+        }
+    }
+    if(hit == 0 && checkFull(set, property) == 1){
+    //if not full then it is a miss, update the staffs in the property&set
+        property.missNum+=1;
+        int index = 0;
+        index = findIndex(set, property);
+        set.lines[index].tag = tag;
+        set.lines[index].valid = 1;
+        int max = 0;
+        max = findMax(set, property);
+        currentCache.sets[setIndex].lines[index].usedCounter = currentCache.sets[setIndex].lines[max].usedCounter+1;
+    }else if(hit == 0){
+        //evict, update the staffs in the property&set
+        property.missNum+=1;
+        property.evictionNum+=1;
+        int evictIndex = 0;
+        //find the evict line
+        evictIndex = findEvict(set, property);
+        set.lines[evictIndex].tag = tag;
+        int max = 0;
+        max = findMax(set, property);
+        currentCache.sets[setIndex].lines[evictIndex].usedCounter = currentCache.sets[setIndex].lines[max].usedCounter+1;
+    }
+    return property;
+}
+int main(int argc, char** argv)
+{
+    cache currentCache;
+    cacheProperty property;
+    //initiate the char to store the trace
+    char* trace;
+    char input;
+    property.verbosity = 0;
+    //parse input
+    while( (input=getopt(argc,argv,"s:E:b:t:vh")) != -1)
+    {
+        switch(input){
+        case 's':
+            property.s = atoi(optarg);
+            break;
+        case 'E':
+            property.E = atoi(optarg);
+            break;
+        case 'b':
+            property.b = atoi(optarg);
+            break;
+        case 't':
+            trace = optarg;
+            break;
+        case 'v':
+            property.verbosity = 1;
+            break;
+        //help
+        case 'h':
+            printUsage();
+            exit(0);
+        default:
+            printUsage();
+            exit(-1);
+        }
+    }
+    //compute S and B
+    property.S = pow(2.0,property.s);
+    property.B = pow(2.0,property.b);
+    //initialize the cache
+    currentCache = initiate(property.S, property.E);
+    //initialize the counters
+    property.missNum = 0;
+    property.hitNum = 0;
+    property.evictionNum = 0;
+    //input file
+    FILE *tmp;
+    //wrap the trace into tmp
+    char command;
+    unsigned long long address;
+    int size;
+    tmp = fopen(trace, "r");
+    while(fscanf(tmp, " %c %llx,%d", &command, &address, &size) == 3){
+        switch(command){
+            //just ignore I
+            case 'I':
+                break;
+            case 'L':
+                property = simulate(currentCache, property, address);
+                break;
+            case 'S':
+                property = simulate(currentCache, property, address);
+                break;
+            //twice for M
+            case 'M':
+                property = simulate(currentCache, property, address);
+                property = simulate(currentCache, property, address);	
+                break;
+            default:
+                break;
+        }
+    }
+    //print result
+    printSummary(property.hitNum, property.missNum, property.evictionNum);
+    fclose(tmp);
+    return 0;
+}
+*** trans.c ***
+cat: /tmp/zhoudiqiu-csim.c.21536/trans.c: No such file or directory
